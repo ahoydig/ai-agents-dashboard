@@ -1,48 +1,118 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+"use client";
 
-const agents = [
-  {
-    id: "centerfisio",
-    name: "CenterFisio",
-    description: "Agente de agendamento para clínica de fisioterapia",
-    status: "active",
-  },
-];
+import { useState } from "react";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { AgentCard } from "@/components/agents/agent-card";
+import { AddAgentModal } from "@/components/agents/add-agent-modal";
+import { EditAgentModal } from "@/components/agents/edit-agent-modal";
+import { useAgents, type AgentWithConfig } from "@/hooks/use-agents";
+import { useCreateAgentConfig, useUpdateAgentConfig } from "@/hooks/use-agent-configs";
+import { toast } from "sonner";
 
 export default function AgentsPage() {
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState<AgentWithConfig | null>(null);
+
+  const { data: agents, isLoading } = useAgents();
+  const createConfig = useCreateAgentConfig();
+  const updateConfig = useUpdateAgentConfig();
+
+  const handleAddAgent = async (data: Parameters<typeof createConfig.mutateAsync>[0]) => {
+    try {
+      await createConfig.mutateAsync(data);
+      setAddModalOpen(false);
+      toast.success("Agente adicionado");
+    } catch (error) {
+      toast.error("Erro ao adicionar agente");
+    }
+  };
+
+  const handleEditAgent = async (data: Parameters<typeof updateConfig.mutateAsync>[0]) => {
+    try {
+      await updateConfig.mutateAsync(data);
+      setEditModalOpen(false);
+      setSelectedAgent(null);
+      toast.success("Agente atualizado");
+    } catch (error) {
+      toast.error("Erro ao atualizar agente");
+    }
+  };
+
+  const openEditModal = (agent: AgentWithConfig) => {
+    setSelectedAgent(agent);
+    setEditModalOpen(true);
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Agentes</h1>
-        <p className="text-muted-foreground">Agentes configurados na plataforma</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Agentes</h1>
+          <p className="text-muted-foreground">
+            Gerencie os agentes configurados na plataforma
+          </p>
+        </div>
+        <Button onClick={() => setAddModalOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Adicionar Agente
+        </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {agents.map((agent) => (
-          <Card key={agent.id} className="cursor-pointer hover:border-primary/50 transition-colors">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>{agent.name}</CardTitle>
-                <Badge variant={agent.status === "active" ? "default" : "secondary"}>
-                  {agent.status}
-                </Badge>
+      {isLoading ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-64" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {agents?.map((agent) => (
+            <AgentCard
+              key={agent.identifier}
+              agent={agent}
+              onEdit={() => openEditModal(agent)}
+            />
+          ))}
+
+          {/* Add new agent card */}
+          <Card
+            className="border-dashed cursor-pointer hover:border-primary/50 transition-colors"
+            onClick={() => setAddModalOpen(true)}
+          >
+            <CardContent className="h-full flex items-center justify-center py-8 min-h-[200px]">
+              <div className="text-center text-muted-foreground">
+                <Plus className="h-8 w-8 mx-auto mb-2" />
+                <p>Adicionar Agente</p>
               </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{agent.description}</p>
-              <p className="text-xs text-muted-foreground mt-2 font-mono">ID: {agent.id}</p>
             </CardContent>
           </Card>
-        ))}
+        </div>
+      )}
 
-        {/* Add new agent card */}
-        <Card className="border-dashed cursor-pointer hover:border-primary/50 transition-colors">
-          <CardContent className="h-full flex items-center justify-center py-8">
-            <p className="text-muted-foreground">+ Adicionar Agente</p>
-          </CardContent>
-        </Card>
-      </div>
+      <AddAgentModal
+        open={addModalOpen}
+        onOpenChange={setAddModalOpen}
+        onSubmit={handleAddAgent}
+        isLoading={createConfig.isPending}
+      />
+
+      {selectedAgent && (
+        <EditAgentModal
+          open={editModalOpen}
+          onOpenChange={(open) => {
+            setEditModalOpen(open);
+            if (!open) setSelectedAgent(null);
+          }}
+          agent={selectedAgent.config}
+          agentIdentifier={selectedAgent.identifier}
+          onSubmit={handleEditAgent}
+          isLoading={updateConfig.isPending}
+        />
+      )}
     </div>
   );
 }

@@ -9,13 +9,16 @@ import {
   Bot,
   Settings,
   Play,
+  FlaskConical,
+  BarChart3,
 } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Sessões", href: "/sessions", icon: MessageSquare },
+  { name: "Playground", href: "/playground", icon: FlaskConical },
+  { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Agentes", href: "/agents", icon: Bot },
-  { name: "Configurações", href: "/settings", icon: Settings },
 ];
 
 export function Sidebar() {
