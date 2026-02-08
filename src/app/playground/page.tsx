@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import type { PlaygroundConfig, PlaygroundMessage, Scenario, ExecutionLogEntry } from "@/types/playground";
 import type { ExecutionLog as ReplayExecutionLog } from "@/types/replay";
 import Link from "next/link";
+import { AlertTriangle } from "lucide-react";
 
 const defaultConfig: PlaygroundConfig = {
   agentIdentifier: "",
@@ -53,6 +54,7 @@ export default function PlaygroundPage() {
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [issueModalOpen, setIssueModalOpen] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isMockMode, setIsMockMode] = useState(false);
 
   const playground = usePlayground();
   const createSession = useCreateTestSession();
@@ -95,6 +97,13 @@ export default function PlaygroundPage() {
         // Build request using helper that respects overrides
         const request = buildPlaygroundRequest(config, content);
         const result = await playground.mutateAsync(request);
+
+        // Detect mock mode from response
+        if ((result as unknown as Record<string, unknown>)._mock) {
+          setIsMockMode(true);
+        } else {
+          setIsMockMode(false);
+        }
 
         const assistantMessage: PlaygroundMessage = {
           id: crypto.randomUUID(),
@@ -147,6 +156,7 @@ export default function PlaygroundPage() {
     setMessages([]);
     setConfig((prev) => ({ ...prev, chatHistory: [] }));
     setCurrentSessionId(null);
+    setIsMockMode(false);
     toast.info("Chat limpo");
   };
 
@@ -323,6 +333,14 @@ export default function PlaygroundPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex-1 flex flex-col min-h-0 pb-4">
+            {isMockMode && (
+              <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-md bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-200 text-xs">
+                <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+                <span>
+                  <strong>Modo simulado</strong> &mdash; O endpoint do agente nao esta disponivel. As respostas sao mockadas e nao refletem o comportamento real do agente (prompt, tools, GoHighLevel).
+                </span>
+              </div>
+            )}
             <div className="flex-1 min-h-0 border rounded-lg mb-4">
               <ChatTimeline messages={messages} />
             </div>

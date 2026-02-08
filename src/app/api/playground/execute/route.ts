@@ -4,10 +4,12 @@ import type { ReplayResponse } from "@/types/replay";
 const AGENTS_API_URL = process.env.AGENTS_API_URL;
 
 // Mock response for development/testing when agent endpoint is unavailable
-function generateMockResponse(body: Record<string, unknown>): ReplayResponse {
+function generateMockResponse(body: Record<string, unknown>): ReplayResponse & { _mock: boolean } {
   const userMessage = (body.user_message as string) || "";
   const model = (body.model_override as string) || (body.model as string) || "gemini-3-flash";
   const temperature = (body.temperature_override as number) || (body.temperature as number) || 0.7;
+  const chatHistory = (body.chat_history as Array<{ role: string; content: string }>) || [];
+  const turnNumber = Math.floor(chatHistory.length / 2) + 1;
 
   const mockToolCalls = userMessage.toLowerCase().includes("agend")
     ? [
@@ -26,6 +28,23 @@ function generateMockResponse(body: Record<string, unknown>): ReplayResponse {
           tool_call_id: "tc-2",
         },
       ]
+    : userMessage.toLowerCase().includes("cancel")
+    ? [
+        {
+          name: "search_patient",
+          args: { phone: "+5581999999999" },
+          result: { found: true, name: "João Silva", id: "p-123" },
+          latency_ms: 198,
+          tool_call_id: "tc-1",
+        },
+        {
+          name: "get_appointments",
+          args: { patient_id: "p-123", status: "scheduled" },
+          result: { appointments: [{ date: "2026-02-12", time: "14:00", professional: "Dra. Maria" }] },
+          latency_ms: 167,
+          tool_call_id: "tc-2",
+        },
+      ]
     : [];
 
   const toolLogs = mockToolCalls.map((tc) => ({
@@ -36,21 +55,33 @@ function generateMockResponse(body: Record<string, unknown>): ReplayResponse {
     details: { args: tc.args, result: tc.result },
   }));
 
-  const responses: Record<string, string> = {
-    agend: "Claro! Posso ajudar com o agendamento. Encontrei horários disponíveis na segunda-feira: 14h, 15h e 16h. Qual horário prefere?",
-    cancel: "Entendi, você gostaria de cancelar. Vou verificar sua consulta agendada. Posso confirmar o cancelamento?",
-    default: `Olá! Sou o assistente CenterFisio. Posso ajudar com agendamentos, cancelamentos, informações sobre procedimentos e convênios. Como posso ajudar?`,
-  };
+  // Context-aware responses based on conversation history
+  const lastAssistantMsg = chatHistory.filter(m => m.role === "assistant").pop()?.content || "";
+  const lowerMsg = userMessage.toLowerCase();
 
-  const matchedKey = Object.keys(responses).find((k) =>
-    userMessage.toLowerCase().includes(k)
-  );
-  const finalResponse = responses[matchedKey || "default"];
+  let finalResponse: string;
+
+  if (lowerMsg.includes("agend") && lastAssistantMsg.includes("horário")) {
+    finalResponse = "Perfeito! Vou confirmar o agendamento. Para qual horário gostaria de agendar?";
+  } else if (lowerMsg.includes("14") || lowerMsg.includes("15") || lowerMsg.includes("16")) {
+    finalResponse = `Ótimo! Agendamento confirmado para ${lowerMsg.match(/\d{1,2}[h:]?\d{0,2}/)?.[0] || "o horário selecionado"}. Você receberá uma confirmação por WhatsApp. Posso ajudar com mais alguma coisa?`;
+  } else if (lowerMsg.includes("agend")) {
+    finalResponse = "Claro! Posso ajudar com o agendamento. Encontrei horários disponíveis na segunda-feira: 14h, 15h e 16h. Qual horário prefere?";
+  } else if (lowerMsg.includes("cancel")) {
+    finalResponse = "Encontrei uma consulta agendada para 12/02 às 14h com Dra. Maria. Deseja confirmar o cancelamento?";
+  } else if (lowerMsg.includes("sim") || lowerMsg.includes("confirma")) {
+    finalResponse = "Pronto! Ação confirmada com sucesso. Posso ajudar com mais alguma coisa?";
+  } else if (lowerMsg.includes("obrigad") || lowerMsg.includes("valeu") || lowerMsg.includes("tchau")) {
+    finalResponse = "Por nada! Qualquer dúvida, é só chamar. Tenha um ótimo dia! 😊";
+  } else {
+    finalResponse = `[MOCK - Turn ${turnNumber}] Olá! Sou o assistente CenterFisio. Posso ajudar com agendamentos, cancelamentos, informações sobre procedimentos e convênios. Como posso ajudar?`;
+  }
 
   const tokensIn = Math.floor(800 + Math.random() * 600);
   const tokensOut = Math.floor(200 + Math.random() * 400);
 
   return {
+    _mock: true,
     assistant_response: finalResponse,
     final_response: finalResponse,
     tool_calls: mockToolCalls,
@@ -86,7 +117,7 @@ function generateMockResponse(body: Record<string, unknown>): ReplayResponse {
         message: "Input validado com sucesso",
         duration_ms: 80 + Math.floor(Math.random() * 60),
         status: "success",
-        details: { safe: true, reason: null, model: "gpt-4o-mini" },
+        details: { safe: true, reason: null },
       },
       ...toolLogs,
       {

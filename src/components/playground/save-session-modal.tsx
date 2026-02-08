@@ -46,7 +46,7 @@ export function SaveSessionModal({
   isLoading,
 }: SaveSessionModalProps) {
   const [name, setName] = useState("");
-  const [scenario, setScenario] = useState<Scenario | "">("");
+  const [scenario, setScenario] = useState<Scenario | "none">("none");
   const [tags, setTags] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
 
@@ -55,14 +55,14 @@ export function SaveSessionModal({
 
     onSave({
       name: name.trim(),
-      scenario: scenario || undefined,
+      scenario: scenario === "none" ? undefined : scenario,
       tags,
       notes: notes.trim() || undefined,
     });
 
     // Reset form
     setName("");
-    setScenario("");
+    setScenario("none");
     setTags([]);
     setNotes("");
   };
@@ -93,13 +93,13 @@ export function SaveSessionModal({
             <Label htmlFor="scenario">Cenário</Label>
             <Select
               value={scenario}
-              onValueChange={(v) => setScenario(v as Scenario | "")}
+              onValueChange={(v) => setScenario(v as Scenario | "none")}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione um cenário" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhum</SelectItem>
+                <SelectItem value="none">Nenhum</SelectItem>
                 {SCENARIO_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
