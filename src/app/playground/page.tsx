@@ -2,18 +2,20 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { Trash2, Save, FolderOpen, Github, ChevronLeft, ChevronRight } from "lucide-react";
+import { Trash2, Save, FolderOpen, Github, ChevronLeft, ChevronRight, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PlaygroundConfigPanel } from "@/components/playground/playground-config";
 import { ChatTimeline } from "@/components/playground/chat-timeline";
 import { ChatInput } from "@/components/playground/chat-input";
 import { SaveSessionModal } from "@/components/playground/save-session-modal";
 import { CreateIssueModal } from "@/components/playground/create-issue-modal";
-import { usePlayground } from "@/hooks/use-playground";
+import { usePlayground, buildPlaygroundRequest } from "@/hooks/use-playground";
 import { useTestSession, useCreateTestSession, useUpdateTestSession } from "@/hooks/use-test-sessions";
 import { toast } from "sonner";
-import type { PlaygroundConfig, PlaygroundMessage, Scenario } from "@/types/playground";
+import type { PlaygroundConfig, PlaygroundMessage, Scenario, ExecutionLogEntry } from "@/types/playground";
+import type { ExecutionLog as ReplayExecutionLog } from "@/types/replay";
 import Link from "next/link";
 
 const defaultConfig: PlaygroundConfig = {
@@ -24,7 +26,22 @@ const defaultConfig: PlaygroundConfig = {
   patientContext: {},
   crmContext: {},
   chatHistory: [],
+  useModelOverride: false,
+  useTemperatureOverride: false,
+  useSystemPromptOverride: false,
 };
+
+// Helper to convert replay execution logs to playground format
+function convertExecutionLogs(logs?: ReplayExecutionLog[]): ExecutionLogEntry[] | undefined {
+  if (!logs || logs.length === 0) return undefined;
+  return logs.map((log) => ({
+    step: log.step,
+    message: log.message,
+    duration_ms: log.duration_ms,
+    status: log.status,
+    details: log.details,
+  }));
+}
 
 export default function PlaygroundPage() {
   const searchParams = useSearchParams();
@@ -75,16 +92,9 @@ export default function PlaygroundPage() {
       ];
 
       try {
-        const result = await playground.mutateAsync({
-          system_prompt: config.systemPrompt,
-          chat_history: config.chatHistory,
-          user_message: content,
-          patient_context: config.patientContext,
-          crm_context: config.crmContext,
-          model: config.model,
-          temperature: config.temperature,
-          agent_identifier: config.agentIdentifier,
-        });
+        // Build request using helper that respects overrides
+        const request = buildPlaygroundRequest(config, content);
+        const result = await playground.mutateAsync(request);
 
         const assistantMessage: PlaygroundMessage = {
           id: crypto.randomUUID(),
@@ -98,6 +108,10 @@ export default function PlaygroundPage() {
             latency: result.latencies.total_ms,
           },
           toolCalls: result.tool_calls,
+          // Include execution logs from response
+          executionLogs: convertExecutionLogs(result.execution_logs),
+          // Include config used
+          configUsed: result.config_used,
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
@@ -283,11 +297,28 @@ export default function PlaygroundPage() {
         <Card className="flex-1 flex flex-col min-h-0">
           <CardHeader className="pb-2 flex-shrink-0">
             <CardTitle className="flex items-center justify-between text-base">
-              <span>Chat</span>
+              <div className="flex items-center gap-2">
+                <span>Chat</span>
+                <Activity className="h-4 w-4 text-muted-foreground" />
+              </div>
               {config.agentIdentifier && (
-                <span className="text-sm font-normal text-muted-foreground">
-                  {config.agentIdentifier} | {config.model}
-                </span>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs font-mono">
+                    {config.agentIdentifier}
+                  </Badge>
+                  <Badge
+                    variant={config.useModelOverride ? "default" : "secondary"}
+                    className="text-xs font-mono"
+                  >
+                    {config.model}
+                    {config.useModelOverride && " (override)"}
+                  </Badge>
+                  {config.useTemperatureOverride && (
+                    <Badge variant="default" className="text-xs">
+                      T: {config.temperature.toFixed(1)}
+                    </Badge>
+                  )}
+                </div>
               )}
             </CardTitle>
           </CardHeader>

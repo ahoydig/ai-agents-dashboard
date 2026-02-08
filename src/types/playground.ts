@@ -39,6 +39,35 @@ export interface PlaygroundConfig {
   patientContext: Record<string, unknown>;
   crmContext: Record<string, unknown>;
   chatHistory: ChatMessage[];
+  // Override flags - when true, use the values above instead of agent defaults
+  useModelOverride?: boolean;
+  useTemperatureOverride?: boolean;
+  useSystemPromptOverride?: boolean;
+}
+
+export type ExecutionLogStep =
+  | "context"
+  | "guardrail_input"
+  | "tool"
+  | "llm"
+  | "guardrail_output"
+  | "complete"
+  | "error";
+
+export type ExecutionLogStatus = "pending" | "success" | "error" | "skipped";
+
+export interface ExecutionLogEntry {
+  step: ExecutionLogStep;
+  message: string;
+  duration_ms: number;
+  status: ExecutionLogStatus;
+  details?: Record<string, unknown>;
+}
+
+export interface ConfigUsed {
+  model: string;
+  temperature: number;
+  system_prompt: string;
 }
 
 export interface PlaygroundMessage {
@@ -53,22 +82,18 @@ export interface PlaygroundMessage {
     latency: number;
   };
   toolCalls?: ToolCall[];
+  executionLogs?: ExecutionLogEntry[];
+  configUsed?: ConfigUsed;
   error?: string;
 }
 
+// Legacy ExecutionLog type for compatibility
 export interface ExecutionLog {
   id: string;
-  type:
-    | "context"
-    | "guardrail_input"
-    | "tool"
-    | "llm"
-    | "guardrail_output"
-    | "complete"
-    | "error";
+  type: ExecutionLogStep;
   message: string;
   latencyMs?: number;
-  status: "pending" | "success" | "error";
+  status: ExecutionLogStatus;
   details?: Record<string, unknown>;
   timestamp: string;
 }

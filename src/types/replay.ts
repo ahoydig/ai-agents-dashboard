@@ -9,6 +9,35 @@ export interface ReplayRequest {
   model: string;
   temperature: number;
   agent_identifier: string;
+  // Optional overrides - if not provided, uses agent defaults
+  model_override?: string;
+  temperature_override?: number;
+  system_prompt_override?: string;
+}
+
+export type ExecutionLogStep =
+  | "context"
+  | "guardrail_input"
+  | "tool"
+  | "llm"
+  | "guardrail_output"
+  | "complete"
+  | "error";
+
+export type ExecutionLogStatus = "pending" | "success" | "error" | "skipped";
+
+export interface ExecutionLog {
+  step: ExecutionLogStep;
+  message: string;
+  duration_ms: number;
+  status: ExecutionLogStatus;
+  details?: Record<string, unknown>;
+}
+
+export interface ConfigUsed {
+  model: string;
+  temperature: number;
+  system_prompt: string;
 }
 
 export interface ReplayResponse {
@@ -32,6 +61,9 @@ export interface ReplayResponse {
     output_safe: boolean;
     sanitized: boolean;
   };
+  // New observability fields
+  config_used?: ConfigUsed;
+  execution_logs?: ExecutionLog[];
   error?: string;
 }
 

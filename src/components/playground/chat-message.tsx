@@ -2,9 +2,10 @@
 
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { User, Bot, AlertTriangle, Wrench } from "lucide-react";
+import { User, Bot, AlertTriangle, Wrench, Settings2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { ExecutionLogs } from "./execution-logs";
 import type { PlaygroundMessage } from "@/types/playground";
 
 interface ChatMessageProps {
@@ -15,6 +16,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user";
   const hasError = !!message.error;
   const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
+  const hasExecutionLogs = message.executionLogs && message.executionLogs.length > 0;
+  const hasConfigUsed = message.configUsed;
 
   return (
     <div
@@ -29,7 +32,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         </div>
       )}
 
-      <div className={cn("flex-1 max-w-[80%]", !isUser && "order-first")}>
+      <div className={cn("flex-1 max-w-[85%]", !isUser && "order-first")}>
         <div
           className={cn(
             "flex items-center gap-2 mb-1",
@@ -42,6 +45,13 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <span className="text-xs font-medium">
             {isUser ? "Você" : "Agente"}
           </span>
+          {/* Show config used if available */}
+          {hasConfigUsed && (
+            <Badge variant="outline" className="text-xs font-mono">
+              <Settings2 className="h-3 w-3 mr-1" />
+              {message.configUsed?.model}
+            </Badge>
+          )}
         </div>
 
         <div
@@ -65,10 +75,15 @@ export function ChatMessage({ message }: ChatMessageProps) {
           ) : (
             <p className="text-sm whitespace-pre-wrap">{message.content}</p>
           )}
+
+          {/* Execution Logs - collapsible */}
+          {hasExecutionLogs && (
+            <ExecutionLogs logs={message.executionLogs!} />
+          )}
         </div>
 
         {/* Tool calls */}
-        {hasToolCalls && (
+        {hasToolCalls && !hasExecutionLogs && (
           <div className="mt-2 flex flex-wrap gap-1">
             <Wrench className="h-3 w-3 text-muted-foreground" />
             {message.toolCalls?.slice(0, 3).map((tool, i) => (
